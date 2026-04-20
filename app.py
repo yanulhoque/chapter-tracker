@@ -12,18 +12,19 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 # 2. Robust data loading with error handling
 def get_all_data():
     try:
+        # ttl=0 ensures we always get the freshest data from the sheet
         df = conn.read(worksheet="Sheet1", ttl=0)
         # Force types to string to avoid the previous TypeError
         df['status'] = df['status'].astype(str)
         df['user'] = df['user'].astype(str)
         return df
     except Exception as e:
-        st.error("The app is having trouble reaching Google Sheets. Please wait a moment and refresh.")
+        st.error(f"Error reaching Google Sheets: {e}")
         st.stop()
 
 df = get_all_data()
 
-# 3. Centralized update function with a "cooldown" to prevent API errors
+# 3. Centralized update function with a "cooldown"
 def safe_update(new_df):
     try:
         with st.spinner("Updating status..."):
@@ -33,21 +34,21 @@ def safe_update(new_df):
             time.sleep(1) 
             st.rerun()
     except Exception as e:
-        st.error("Google is busy! Please wait 10 seconds before trying again.")
+        st.error(f"Update failed: {e}")
 
 # 4. Sidebar for User Selection
 users = ["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"]
 selected_user = st.sidebar.selectbox("Select your name:", users)
 
 # 5. Track Progress
-completed_chapters = df[df['status'] == 'Completed']
+# Convert 'status' to string for comparison to be safe
+completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
 st.sidebar.metric("Current progress", f"{progress} / 30")
 
 # 6. Reset Logic (When all 30 are done)
 if progress == 30:
-    st.balloons()
-    st.confetti() 
+    st.balloons() # This is the standard Streamlit celebration
     if st.sidebar.button("🎉 Finish Khatam and start another one!"):
         # Reset all chapters to available
         df['status'] = 'Available'
@@ -60,16 +61,16 @@ st.info(f"Welcome **{selected_user}**. Please reserve a Juz or mark your progres
 # 7. Display Chapters
 for index, row in df.iterrows():
     ch_num = row['chapter']
-    status = str(row['status'])
-    assigned_user = str(row['user'])
+    status = str(row['status']).strip()
+    assigned_user = str(row['user']).strip()
     
     with st.container():
         col1, col2, col3 = st.columns([1, 2, 2])
         
         col1.write(f"**Juz {ch_num}**")
         
-        # Check for different possible empty values
-        if status in ["Available", "nan", "None", ""]:
+        # Check for empty or available statuses
+        if status in ["Available", "nan", "None", "", "nan"]:
             col2.caption("🟢 Available")
             if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True):
                 df.at[index, 'status'] = 'Reserved'
