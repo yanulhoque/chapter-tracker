@@ -9,25 +9,33 @@ st.title("Team 37 Chapter Tracker")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 1. Load data
+# 1. Load data with Caching (ttl=10) to prevent 429 Errors
 def get_all_data():
     try:
-        df = conn.read(worksheet="Sheet1", ttl=0)
-        # Force chapter to int to remove decimals, then to string for display
-        df['chapter'] = pd.to_numeric(df['chapter']).astype(int)
+        # Load Main Data - 10 second cache
+        df = conn.read(worksheet="Sheet1", ttl=10)
+        
+        # FIX: Ensure chapter is an integer to remove .0 decimals
+        df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
         df['status'] = df['status'].astype(str)
         df['user'] = df['user'].astype(str)
         
-        # Load History for Stats
+        # Load History - 60 second cache (since stats don't change as fast)
         try:
-            history_df = conn.read(worksheet="History", ttl=0)
+            history_df = conn.read(worksheet="History", ttl=60)
         except:
             history_df = pd.DataFrame(columns=['date', 'user', 'chapter', 'khatam_number'])
             
         return df, history_df
     except Exception as e:
-        st.error(f"Error reaching Google Sheets: {e}")
-        st.stop()
+        # If Google is busy, show a countdown instead of a crash
+        if "429" in str(e):
+            st.warning("⚠️ Google is busy. Retrying in 10 seconds...")
+            time.sleep(10)
+            st.rerun()
+        else:
+            st.error(f"Error reaching Google Sheets: {e}")
+            st.stop()
 
 df, history_df = get_all_data()
 
@@ -55,7 +63,7 @@ completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
 st.sidebar.metric("Current Khatam Progress", f"{progress} / 30")
 
-# 4. Centralized update function
+# 4. Centralized update function with a "cooldown"
 def safe_update(main_df, log_entry=None):
     try:
         with st.spinner("Updating status..."):
@@ -66,8 +74,9 @@ def safe_update(main_df, log_entry=None):
                 new_history = pd.concat([history_df, pd.DataFrame([log_entry])], ignore_index=True)
                 conn.update(worksheet="History", data=new_history)
             
+            # CRITICAL: Clear cache so the update shows up immediately
             st.cache_data.clear()
-            time.sleep(1) 
+            time.sleep(2) 
             st.rerun()
     except Exception as e:
         st.error(f"Update failed: {e}")
@@ -85,7 +94,7 @@ st.info(f"Welcome **{selected_user}**. Please reserve a Juz or mark your progres
 
 # 6. Display Chapters
 for index, row in df.iterrows():
-    ch_num = int(row['chapter']) # Ensure it's an integer for display
+    ch_num = int(row['chapter']) # Final safety check for integer
     status = str(row['status']).strip()
     assigned_user = str(row['user']).strip()
     
@@ -108,13 +117,12 @@ for index, row in df.iterrows():
                     
                     # Prepare history log entry
                     k_num = (history_df['khatam_number'].max() if not history_df.empty else 0)
-                    if progress == 29: k_num += 1 # If this is the last one, it's a new Khatam
-                    
+                    # If this is the final juz, it pushes the count to the next number
                     log = {
                         'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
                         'user': selected_user,
                         'chapter': ch_num,
-                        'khatam_number': k_num if progress < 30 else k_num + 1
+                        'khatam_number': k_num if progress < 29 else k_num + 1
                     }
                     safe_update(df, log)
             else:
