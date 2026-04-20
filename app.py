@@ -37,8 +37,8 @@ if progress == 30:
         st.cache_data.clear()
         st.rerun()
 
-st.write("### Chapter List")
-st.info("Select your name in the sidebar, then reserve a chapter below.")
+st.write("### Juz list")
+st.info("Select your name from the sidebar, then reserve a chapter below.")
 
 # 5. Display Chapters
 for index, row in df.iterrows():
@@ -63,15 +63,15 @@ for index, row in df.iterrows():
                 
         elif status == "Reserved":
             if assigned_user == selected_user:
-                col2.warning("🕒 Your turn")
-                if col3.button("Complete", key=f"done_{ch_num}", use_container_width=True):
+                col2.warning("🕒 Reading in progress")
+                if col3.button("Mark as complete", key=f"done_{ch_num}", use_container_width=True):
                     df.at[index, 'status'] = 'Completed'
                     conn.update(worksheet="Sheet1", data=df)
                     st.cache_data.clear()
                     st.rerun()
             else:
                 col2.error(f"👤 {assigned_user}")
-                col3.write("🔒 Locked")
+                col3.write("🔒 Reserved")
                 
         elif status == "Completed":
             col2.success(f"✅ {assigned_user}")
