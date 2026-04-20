@@ -7,20 +7,26 @@ from datetime import datetime
 st.set_page_config(page_title="Quran Tracker", page_icon="📖")
 st.title("Team 37 Chapter Tracker")
 
+# --- AUTO REFRESH LOGIC ---
+# This refreshes the app every 120 seconds (2 minutes) to keep data current for all users
+if "last_refresh" not in st.session_state:
+    st.session_state.last_refresh = time.time()
+
+# Every 120 seconds, the app will rerun to fetch the latest from Google Sheets
+st.cache_data.clear() # Optional: force clear on each cycle if you want max accuracy
+
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 1. Load data with Caching (ttl=10) to prevent 429 Errors
+# 1. Load data with Caching
 def get_all_data():
     try:
-        # Load Main Data - 10 second cache
+        # Load Main Data
         df = conn.read(worksheet="Sheet1", ttl=10)
-        
-        # FIX: Ensure chapter is an integer to remove .0 decimals
         df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
         df['status'] = df['status'].astype(str)
         df['user'] = df['user'].astype(str)
         
-        # Load History - 60 second cache (since stats don't change as fast)
+        # Load History
         try:
             history_df = conn.read(worksheet="History", ttl=60)
         except:
@@ -28,7 +34,6 @@ def get_all_data():
             
         return df, history_df
     except Exception as e:
-        # If Google is busy, show a countdown instead of a crash
         if "429" in str(e):
             st.warning("⚠️ Google is busy. Retrying in 10 seconds...")
             time.sleep(10)
@@ -39,20 +44,24 @@ def get_all_data():
 
 df, history_df = get_all_data()
 
-# 2. Sidebar Stats & Selection
-users = ["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"]
-selected_user = st.sidebar.selectbox("Select your name:", users)
+# 2. Sidebar Stats & FORCED Selection
+users_list = ["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"]
+users_list.sort() # Optional: Alphabetical order makes it easier to find names
+
+# Add a placeholder at the start
+options = ["-- Select your name --"] + users_list
+selected_user = st.sidebar.selectbox("Identify yourself:", options)
+
+# Check if a real name is picked
+user_is_identified = selected_user != "-- Select your name --"
 
 st.sidebar.divider()
 st.sidebar.subheader("📊 Stats")
 
-# Calculate Stats
 if not history_df.empty:
     total_khatams = history_df['khatam_number'].max() if 'khatam_number' in history_df.columns else 0
     st.sidebar.write(f"**Total Khatams:** {int(total_khatams)}")
-    
-    # User Leaderboard (Most chapters read overall)
-    st.sidebar.write("**Leaderboard (Top Readers):**")
+    st.sidebar.write("**Leaderboard:**")
     leaderboard = history_df['user'].value_counts().head(5)
     st.sidebar.table(leaderboard)
 else:
@@ -63,20 +72,17 @@ completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
 st.sidebar.metric("Current Khatam Progress", f"{progress} / 30")
 
-# 4. Centralized update function with a "cooldown"
+# 4. Centralized update function
 def safe_update(main_df, log_entry=None):
     try:
         with st.spinner("Updating status..."):
             conn.update(worksheet="Sheet1", data=main_df)
             if log_entry is not None:
-                # Append to History sheet
                 global history_df
                 new_history = pd.concat([history_df, pd.DataFrame([log_entry])], ignore_index=True)
                 conn.update(worksheet="History", data=new_history)
-            
-            # CRITICAL: Clear cache so the update shows up immediately
             st.cache_data.clear()
-            time.sleep(2) 
+            time.sleep(1) 
             st.rerun()
     except Exception as e:
         st.error(f"Update failed: {e}")
@@ -84,17 +90,24 @@ def safe_update(main_df, log_entry=None):
 # 5. Reset Logic
 if progress == 30:
     st.balloons()
-    if st.sidebar.button("Khatam finished Alhamdulillah. Start another one!"):
-        df['status'] = 'Available'
-        df['user'] = ''
-        safe_update(df)
+    if st.sidebar.button("Khatam finished Alhamdulillah. Click here to start another one!"):
+        if user_is_identified:
+            df['status'] = 'Available'
+            df['user'] = ''
+            safe_update(df)
+        else:
+            st.sidebar.error("Please select your name first!")
 
 st.write("### Juz list")
-st.info(f"Welcome **{selected_user}**. Please reserve a Juz or mark your progress below.")
+
+if not user_is_identified:
+    st.warning("⚠️ Please select your name in the sidebar to reserve or complete a Juz.")
+else:
+    st.info(f"Welcome **{selected_user}**. Page auto-refreshes every 2 minutes.")
 
 # 6. Display Chapters
 for index, row in df.iterrows():
-    ch_num = int(row['chapter']) # Final safety check for integer
+    ch_num = int(row['chapter'])
     status = str(row['status']).strip()
     assigned_user = str(row['user']).strip()
     
@@ -104,7 +117,8 @@ for index, row in df.iterrows():
         
         if status in ["Available", "nan", "None", ""]:
             col2.caption("🟢 Available")
-            if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True):
+            # Button is DISABLED if user hasn't picked a name
+            if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
                 df.at[index, 'status'] = 'Reserved'
                 df.at[index, 'user'] = selected_user
                 safe_update(df)
@@ -114,10 +128,7 @@ for index, row in df.iterrows():
                 col2.warning("🕒 Reading")
                 if col3.button("Complete", key=f"done_{ch_num}", use_container_width=True):
                     df.at[index, 'status'] = 'Completed'
-                    
-                    # Prepare history log entry
                     k_num = (history_df['khatam_number'].max() if not history_df.empty else 0)
-                    # If this is the final juz, it pushes the count to the next number
                     log = {
                         'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
                         'user': selected_user,
@@ -134,3 +145,9 @@ for index, row in df.iterrows():
             col3.write("Finished")
         
         st.divider()
+
+# --- TRIGGER AUTO REFRESH ---
+# This invisible element tells the browser to refresh the page after the set time
+st.empty()
+time_to_wait = 120 # seconds
+st.write(f'<meta http-equiv="refresh" content="{time_to_wait}">', unsafe_content_as_html=True)
