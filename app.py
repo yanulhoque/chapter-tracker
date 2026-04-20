@@ -3,7 +3,7 @@ from itertools import count
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.title("📖 Group Chapter Tracker")
+st.title("📖 Quran Chapter Tracker")
 
 # 1. Connect to Google Sheets
 # Note: In production, you'll put your sheet URL in Streamlit Secrets
@@ -30,12 +30,12 @@ current_ch = int(data['current_chapter'])
 total_reads = int(data['total_reads'])
 
 # UI Logic
-users = ["Alice", "Bob", "Charlie", "Diana"] # Add your names here
+users = ["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"] # Add your names here
 selected_user = st.selectbox("Who is reading this chapter?", users)
 
 col1, col2 = st.columns(2)
 col1.metric("Current Chapter", f"{current_ch} / 30")
-col2.metric("Total Book Completions", total_reads)
+col2.metric("Total Completions", total_reads)
 
 if st.button(f"Confirm: {selected_user} finished Chapter {current_ch}"):
     if current_ch < 30:
@@ -45,7 +45,7 @@ if st.button(f"Confirm: {selected_user} finished Chapter {current_ch}"):
         new_ch = 1
         new_total = total_reads + 1
         st.balloons()
-        st.success("The book has been finished! Restarting...")
+        st.success("One reading of the Quran complete! Restarting...")
 
     update_data(new_ch, new_total)
     st.rerun()
