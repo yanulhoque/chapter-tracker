@@ -7,26 +7,16 @@ from datetime import datetime
 st.set_page_config(page_title="Quran Tracker", page_icon="📖")
 st.title("Team 37 Chapter Tracker")
 
-# --- AUTO REFRESH LOGIC ---
-# This refreshes the app every 120 seconds (2 minutes) to keep data current for all users
-if "last_refresh" not in st.session_state:
-    st.session_state.last_refresh = time.time()
-
-# Every 120 seconds, the app will rerun to fetch the latest from Google Sheets
-st.cache_data.clear() # Optional: force clear on each cycle if you want max accuracy
-
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 1. Load data with Caching
 def get_all_data():
     try:
-        # Load Main Data
         df = conn.read(worksheet="Sheet1", ttl=10)
         df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
         df['status'] = df['status'].astype(str)
         df['user'] = df['user'].astype(str)
         
-        # Load History
         try:
             history_df = conn.read(worksheet="History", ttl=60)
         except:
@@ -44,15 +34,12 @@ def get_all_data():
 
 df, history_df = get_all_data()
 
-# 2. Sidebar Stats & FORCED Selection
+# 2. Sidebar Stats & Selection
 users_list = ["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"]
-users_list.sort() # Optional: Alphabetical order makes it easier to find names
+users_list.sort()
 
-# Add a placeholder at the start
 options = ["-- Select your name --"] + users_list
 selected_user = st.sidebar.selectbox("Identify yourself:", options)
-
-# Check if a real name is picked
 user_is_identified = selected_user != "-- Select your name --"
 
 st.sidebar.divider()
@@ -67,12 +54,11 @@ if not history_df.empty:
 else:
     st.sidebar.write("No history recorded yet.")
 
-# 3. Track Current Progress
 completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
 st.sidebar.metric("Current Khatam Progress", f"{progress} / 30")
 
-# 4. Centralized update function
+# 3. Update Function
 def safe_update(main_df, log_entry=None):
     try:
         with st.spinner("Updating status..."):
@@ -87,10 +73,10 @@ def safe_update(main_df, log_entry=None):
     except Exception as e:
         st.error(f"Update failed: {e}")
 
-# 5. Reset Logic
+# 4. Reset Logic
 if progress == 30:
     st.balloons()
-    if st.sidebar.button("Khatam finished Alhamdulillah. Click here to start another one!"):
+    if st.sidebar.button("Khatam finished Alhamdulillah. Start another one!"):
         if user_is_identified:
             df['status'] = 'Available'
             df['user'] = ''
@@ -103,9 +89,9 @@ st.write("### Juz list")
 if not user_is_identified:
     st.warning("⚠️ Please select your name in the sidebar to reserve or complete a Juz.")
 else:
-    st.info(f"Welcome **{selected_user}**. Page auto-refreshes every 2 minutes.")
+    st.info(f"Welcome **{selected_user}**. Page auto-refreshes every 2 mins.")
 
-# 6. Display Chapters
+# 5. Display Chapters
 for index, row in df.iterrows():
     ch_num = int(row['chapter'])
     status = str(row['status']).strip()
@@ -115,9 +101,8 @@ for index, row in df.iterrows():
         col1, col2, col3 = st.columns([1, 2, 2])
         col1.write(f"**Juz {ch_num}**")
         
-        if status in ["Available", "nan", "None", ""]:
+        if status in ["Available", "nan", "None", "", "nan"]:
             col2.caption("🟢 Available")
-            # Button is DISABLED if user hasn't picked a name
             if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
                 df.at[index, 'status'] = 'Reserved'
                 df.at[index, 'user'] = selected_user
@@ -146,8 +131,6 @@ for index, row in df.iterrows():
         
         st.divider()
 
-# --- TRIGGER AUTO REFRESH ---
-# This invisible element tells the browser to refresh the page after the set time
-st.empty()
-time_to_wait = 120 # seconds
-st.write(f'<meta http-equiv="refresh" content="{time_to_wait}">', unsafe_content_as_html=True)
+# --- FIXED AUTO REFRESH ---
+# Use st.markdown with the correct parameter: unsafe_allow_html=True
+st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
