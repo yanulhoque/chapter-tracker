@@ -92,6 +92,14 @@ else:
     st.info(f"Welcome **{selected_user}**. Page auto-refreshes every 2 mins.")
 
 # 5. Display Chapters
+# Find the FIRST available chapter number to enforce order
+try:
+    # Filter for available rows and get the minimum chapter number
+    available_chapters = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
+    next_up_chapter = available_chapters['chapter'].min()
+except:
+    next_up_chapter = None
+
 for index, row in df.iterrows():
     ch_num = int(row['chapter'])
     status = str(row['status']).strip()
@@ -102,11 +110,16 @@ for index, row in df.iterrows():
         col1.write(f"**Juz {ch_num}**")
         
         if status in ["Available", "nan", "None", "", "nan"]:
-            col2.caption("🟢 Available")
-            if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
-                df.at[index, 'status'] = 'Reserved'
-                df.at[index, 'user'] = selected_user
-                safe_update(df)
+            # Only show the button if this is the NEXT chapter in sequence
+            if ch_num == next_up_chapter:
+                col2.caption("🟢 Next Available")
+                if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
+                    df.at[index, 'status'] = 'Reserved'
+                    df.at[index, 'user'] = selected_user
+                    safe_update(df)
+            else:
+                col2.caption("⚪ Unavailable")
+                col3.write(" ")
                 
         elif status == "Reserved":
             if assigned_user == selected_user:
@@ -127,7 +140,7 @@ for index, row in df.iterrows():
                 
         elif status == "Completed":
             col2.success(f"✅ {assigned_user}")
-            col3.write("Finished")
+            col3.write("Completed")
         
         st.divider()
 
