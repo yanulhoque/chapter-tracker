@@ -100,21 +100,35 @@ options = ["-- Select your name --"] + users_list
 selected_user = st.sidebar.selectbox("Identify yourself:", options)
 user_is_identified = selected_user != "-- Select your name --"
 
-st.sidebar.divider()
-st.sidebar.subheader("📊 Stats")
+#st.sidebar.divider()
+#st.sidebar.subheader("📊 Stats")
 
 if not history_df.empty:
     total_khatams = history_df['khatam_number'].max() if 'khatam_number' in history_df.columns else 0
-    st.sidebar.write(f"**Total Khatams:** {int(total_khatams)}")
-    st.sidebar.write("**Leaderboard:**")
-    leaderboard = history_df['user'].value_counts().head(5)
+    
+    st.sidebar.write("**🏆 Top Readers**")
+    
+    # 1. Prepare the leaderboard data
+    leaderboard = history_df['user'].value_counts().reset_index()
+    
+    # 2. Rename columns for a cleaner UI
+    leaderboard.columns = ['Name', 'Juz Completed']
+    
+    # 3. Add a rank index starting from 1 instead of 0
+    leaderboard.index = leaderboard.index + 1
+    
+    # 4. Display as a table
     st.sidebar.table(leaderboard)
+
+    st.sidebar.write(f"**Total khatams completed:** {int(total_khatams)}")
+    
 else:
     st.sidebar.write("No history recorded yet.")
 
 completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
-st.sidebar.metric("Current progress", f"{progress} / 30")
+st.sidebar.write(f"**Juz completed for this khatam:** {progress} / 30")
+#st.sidebar.metric("", f"{progress} / 30")
 
 # 3. Update Function
 def safe_update(main_df, log_entry=None):
