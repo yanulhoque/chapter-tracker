@@ -8,33 +8,61 @@ st.set_page_config(page_title="Quran Tracker", page_icon="📖")
 # Custom CSS for a cleaner UI
 st.markdown("""
     <style>
-    /* Main background and font */
-    .main {
-        background-color: #f8f9fa;
+    /* Change the background of the whole app */
+    .stApp {
+        background: linear-gradient(to bottom, #f0f2f6, #ffffff);
     }
     
-    /* Style the chapter cards */
-    [data-testid="stVerticalBlock"] > div:has(div.stColumn) {
-        background: white;
-        padding: 5px;
-        border-radius: 5px;
-        margin-bottom: 0;
+    /* Make the Sidebar look distinct */
+    [data-testid="stSidebar"] {
+        background-color: #1E3A8A;
+        color: white;
+        
+        p {
+            color: white;
+        }
+    }
+    
+    /* Style the metrics */
+    [data-testid="stMetricValue"] {
+        color: #1E3A8A;
+        font-weight: bold;
     }
 
-    /* Customize buttons */
-    .stButton>button {
+    /* Style every 'card' container */
+    div[data-testid="stVerticalBlock"] > div:has(div.stColumn):first-of-type {
+        background-color: white;
         border-radius: 10px;
-        transition: all 0.3s ease;
+        padding: 10px;
+        border: 1px solid #ccc;
     }
-    
-    /* Style headers */
-    h1 {
-        color: #1E3A8A; /* Deep Blue */
-        text-align: center;
-        font-weight: 800;
-    }
+            
+    /* Style the Stats Table in the Sidebar */
+section[data-testid="stSidebar"] .stTable {
+    border-radius: 10px;
+    overflow: hidden; /* Ensures corners stay rounded */
+    border: 1px solid #e0e0e0;
+    background-color: rgba(255,255,255,0.1)!important;
+}
+
+/* Header styling */
+section[data-testid="stSidebar"] thead th {
+    color: white !important;
+    text-align: left !important;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+/* Row styling */
+section[data-testid="stSidebar"] td {
+    color: #333 !important;
+    font-size: 0.9rem;
+    padding: 10px !important;
+    text-align: left !important;
+}
     </style>
     """, unsafe_allow_html=True)
+
 st.title("Team 37 Chapter Tracker")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -86,7 +114,7 @@ else:
 
 completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
-st.sidebar.metric("Current Khatam Progress", f"{progress} / 30")
+st.sidebar.metric("Current progress", f"{progress} / 30")
 
 # 3. Update Function
 def safe_update(main_df, log_entry=None):
@@ -114,7 +142,7 @@ if progress == 30:
         else:
             st.sidebar.error("Please select your name first!")
 
-st.write("### Juz list")
+#st.write("### Juz list")
 
 if not user_is_identified:
     st.warning("⚠️ Please select your name in the sidebar to reserve or complete a Juz.")
@@ -122,11 +150,11 @@ else:
     st.info(f"Welcome **{selected_user}**. Page auto-refreshes every 2 mins.")
 
 # 5. Display Chapters
-# Find the FIRST available chapter number to enforce order
+# Find the FIRST available chapter number
 try:
-    # Filter for available rows and get the minimum chapter number
     available_chapters = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
-    next_up_chapter = available_chapters['chapter'].min()
+    # Ensure it's treated as a number for the min() function
+    next_up_chapter = pd.to_numeric(available_chapters['chapter']).min()
 except:
     next_up_chapter = None
 
@@ -140,16 +168,18 @@ for index, row in df.iterrows():
         col1.write(f"**Juz {ch_num}**")
         
         if status in ["Available", "nan", "None", "", "nan"]:
-            # Only show the button if this is the NEXT chapter in sequence
             if ch_num == next_up_chapter:
-                col2.caption("🟢 Next Available")
+                # This part is NOT disabled - it stays bright/visible
+                col2.info("✨ **Available**")
+                
+                # ONLY the button is disabled based on name selection
                 if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
                     df.at[index, 'status'] = 'Reserved'
                     df.at[index, 'user'] = selected_user
                     safe_update(df)
             else:
                 col2.caption("⚪ Unavailable")
-                col3.write(" ")
+                col3.write("")
                 
         elif status == "Reserved":
             if assigned_user == selected_user:
@@ -183,7 +213,7 @@ for index, row in df.iterrows():
             col2.success(f"✅ {assigned_user}")
             col3.write("Completed")
         
-        st.divider()
+        #st.divider()
 
 # --- FIXED AUTO REFRESH ---
 # Use st.markdown with the correct parameter: unsafe_allow_html=True
