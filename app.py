@@ -5,6 +5,36 @@ import time
 from datetime import datetime
 
 st.set_page_config(page_title="Quran Tracker", page_icon="📖")
+# Custom CSS for a cleaner UI
+st.markdown("""
+    <style>
+    /* Main background and font */
+    .main {
+        background-color: #f8f9fa;
+    }
+    
+    /* Style the chapter cards */
+    [data-testid="stVerticalBlock"] > div:has(div.stColumn) {
+        background: white;
+        padding: 5px;
+        border-radius: 5px;
+        margin-bottom: 0;
+    }
+
+    /* Customize buttons */
+    .stButton>button {
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    /* Style headers */
+    h1 {
+        color: #1E3A8A; /* Deep Blue */
+        text-align: center;
+        font-weight: 800;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 st.title("Team 37 Chapter Tracker")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -124,7 +154,11 @@ for index, row in df.iterrows():
         elif status == "Reserved":
             if assigned_user == selected_user:
                 col2.warning("🕒 Reading")
-                if col3.button("Complete", key=f"done_{ch_num}", use_container_width=True):
+                
+                # Create two sub-columns for the "Complete" and "Cancel" buttons
+                btn_col1, btn_col2 = col3.columns(2)
+                
+                if btn_col1.button("Complete", key=f"done_{ch_num}", use_container_width=True):
                     df.at[index, 'status'] = 'Completed'
                     k_num = (history_df['khatam_number'].max() if not history_df.empty else 0)
                     log = {
@@ -134,6 +168,13 @@ for index, row in df.iterrows():
                         'khatam_number': k_num if progress < 29 else k_num + 1
                     }
                     safe_update(df, log)
+                
+                if btn_col2.button("Cancel", key=f"cancel_{ch_num}", use_container_width=True):
+                    # Reset back to available and clear user
+                    df.at[index, 'status'] = 'Available'
+                    df.at[index, 'user'] = ''
+                    safe_update(df)
+                    
             else:
                 col2.error(f"👤 {assigned_user}")
                 col3.write("🔒 Reserved")
