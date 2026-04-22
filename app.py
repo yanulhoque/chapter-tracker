@@ -241,7 +241,7 @@ for index, row in df.iterrows():
         col1, col2, col3 = st.columns([1, 2, 2])
         
         # Col 1: Chapter Number Link
-        col1.markdown(f"<a href='https://quran.com/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3></a>", unsafe_allow_html=True)
+        col1.markdown(f"<a href='https://quran.com/juz/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3></a>", unsafe_allow_html=True)
         
         # Col 2: Status Box
         if status in ["Available", "nan", "None", "", "nan"]:
