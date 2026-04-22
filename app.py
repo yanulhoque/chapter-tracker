@@ -4,62 +4,130 @@ import pandas as pd
 import time
 from datetime import datetime
 
-st.set_page_config(page_title="Quran Tracker", page_icon="📖")
-# Custom CSS for a cleaner UI
+st.set_page_config(page_title="Team 37 Chapter Tracker", page_icon="📖")
+
+# --- CUSTOM CSS ---
 st.markdown("""
     <style>
-    /* Change the background of the whole app */
+    
+    /* Main background */
     .stApp {
         background: linear-gradient(to bottom, #f0f2f6, #ffffff);
     }
     
-    /* Make the Sidebar look distinct */
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
         background-color: #1E3A8A;
         color: white;
-        
-        p {
-            color: white;
-        }
+    }
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+        color: white !important;
     }
     
-    /* Style the metrics */
+    /* Stats Table in Sidebar */
+    section[data-testid="stSidebar"] .stTable {
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.2);
+        background-color: rgba(255,255,255,0.1) !important;
+    }
+    section[data-testid="stSidebar"] thead th {
+        color: white !important;
+        text-align: left !important;
+    }
+    section[data-testid="stSidebar"] td {
+        color: white !important;
+        background-color: transparent !important;
+        text-align: left !important;
+    }
+
+    /* CENTER EVERYTHING in the main Juz list */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        text-align: center !important;
+    }
+    .stButton {
+        display: flex;
+        justify-content: center;
+    }
+    
+    /* Main Selectbox Centering */
+    [data-testid="stSelectbox"] {
+        
+        margin: 0 auto;
+    }
+
+    /* Card Styling */
+    div[data-testid="stVerticalBlock"] > div:has(div.stColumn) {
+        background-color: white;
+        border-radius: 5px;
+        padding: 5px 10px 0 10px;
+        /*box-shadow: 0 2px 4px rgba(0,0,0,0.05);*/
+        margin-bottom: 0;
+    }
+
+    /* Metric Styling */
     [data-testid="stMetricValue"] {
         color: #1E3A8A;
         font-weight: bold;
     }
+            
+/* Hide the anchor link next to headings */
+.st-emotion-cache-gi0tri {
+    display: none !important;
+}
+    /* 1. Adjust the vertical gap between elements inside the same column */
+    [data-testid="stVerticalBlock"] {
+        gap: 1rem !important; /* Change this value to adjust spacing */
+    }
 
-    /* Style every 'card' container */
-    div[data-testid="stVerticalBlock"] > div:has(div.stColumn):first-of-type {
-        background-color: white;
-        border-radius: 10px;
-        padding: 10px;
-        border: 1px solid #ccc;
+    /* 2. Remove extra padding from the top of the columns */
+    [data-testid="stVerticalBlock"] > div {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+    }
+
+    /* 3. Adjust spacing specifically for the Alert (User name box) */
+    .stAlert {
+        margin-top: 0px !important;
+        margin-bottom: 0px !important;
+        padding: 10px !important; /* Makes the user name box more compact */
+    }
+
+    /* 4. Center the text within the Alert box to match the Juz number */
+    [data-testid="stAlertContainer"] {
+        padding: 10px 10px !important;
+        min-height: auto !important;
     }
             
-    /* Style the Stats Table in the Sidebar */
-section[data-testid="stSidebar"] .stTable {
-    border-radius: 10px;
-    overflow: hidden; /* Ensures corners stay rounded */
-    border: 1px solid #e0e0e0;
-    background-color: rgba(255,255,255,0.1)!important;
-}
+    /* 5. Center the Juz Header (h3) specifically */
+    h3 {
+        font-size: 1.5rem!important;
+        display:flex;
+        justify-content: center;
+    }
+            
+        /* Vertical Centering: This aligns content to the middle of the card's height */
+    [data-testid="stColumn"] > div {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        height: 100%; /* Ensures the column takes up the full height of the card */
+    }
 
-/* Header styling */
-section[data-testid="stSidebar"] thead th {
-    color: white !important;
-    text-align: left !important;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-}
-
-/* Row styling */
-section[data-testid="stSidebar"] td {
-    color: #333 !important;
-    font-size: 0.9rem;
-    padding: 10px !important;
-    text-align: left !important;
-}
+    /* Extra safety: Ensure the vertical block inside also centers its children */
+    [data-testid="stColumn"] [data-testid="stVerticalBlock"] {
+        justify-content: center !important;
+        height: 100% !important;
+    }    
+            
+    .stHorizontalBlock .stColumn:nth-child(3) p {
+        text-align: center;
+    }
+     @media (max-width: 600px) {
+        .stHorizontalBlock .stColumn:nth-child(3) p {
+            padding-bottom:10px;
+        }
+    }       
     </style>
     """, unsafe_allow_html=True)
 
@@ -92,45 +160,36 @@ def get_all_data():
 
 df, history_df = get_all_data()
 
-# 2. Sidebar Stats & Selection
+# --- 2. MAIN WINDOW USER SELECTION ---
 users_list = ["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"]
 users_list.sort()
 
 options = ["-- Select your name --"] + users_list
-selected_user = st.sidebar.selectbox("Identify yourself:", options)
+selected_user = st.selectbox(" ", options)
 user_is_identified = selected_user != "-- Select your name --"
 
-#st.sidebar.divider()
-#st.sidebar.subheader("📊 Stats")
+if not user_is_identified:
+    st.warning("☝️ Please select your name above to reserve or complete a Juz.")
+else:
+    st.info(f"Assalamu Alaikum, **{selected_user}**! Page auto-refreshes every 2 mins.")
 
+# --- 3. SIDEBAR STATS ---
 if not history_df.empty:
     total_khatams = history_df['khatam_number'].max() if 'khatam_number' in history_df.columns else 0
-    
-    st.sidebar.write("**🏆 Top Readers**")
-    
-    # 1. Prepare the leaderboard data
+    st.sidebar.write("### 🏆 Top Readers")
     leaderboard = history_df['user'].value_counts().reset_index()
-    
-    # 2. Rename columns for a cleaner UI
     leaderboard.columns = ['Name', 'Juz Completed']
-    
-    # 3. Add a rank index starting from 1 instead of 0
     leaderboard.index = leaderboard.index + 1
-    
-    # 4. Display as a table
     st.sidebar.table(leaderboard)
-
-    st.sidebar.write(f"**Total khatams completed:** {int(total_khatams)}")
-    
+    st.sidebar.write(f"**Total Khatams Completed:** {int(total_khatams)}")
 else:
     st.sidebar.write("No history recorded yet.")
 
 completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
-st.sidebar.write(f"**Juz completed for this khatam:** {progress} / 30")
-#st.sidebar.metric("", f"{progress} / 30")
+st.sidebar.write(f"**Current Khatam:** {progress} / 30 Juz")
 
-# 3. Update Function
+# 4. Update Function
 def safe_update(main_df, log_entry=None):
     try:
         with st.spinner("Updating status..."):
@@ -145,29 +204,22 @@ def safe_update(main_df, log_entry=None):
     except Exception as e:
         st.error(f"Update failed: {e}")
 
-# 4. Reset Logic
+# 5. Reset Logic
 if progress == 30:
     st.balloons()
-    if st.sidebar.button("Khatam finished Alhamdulillah. Start another one!"):
+    if st.sidebar.button("🎉 Start New Khatam"):
         if user_is_identified:
             df['status'] = 'Available'
             df['user'] = ''
             safe_update(df)
         else:
-            st.sidebar.error("Please select your name first!")
+            st.sidebar.error("Select your name first!")
 
-#st.write("### Juz list")
+#st.write("---")
 
-if not user_is_identified:
-    st.warning("⚠️ Please select your name in the sidebar to reserve or complete a Juz.")
-else:
-    st.info(f"Welcome **{selected_user}**. Page auto-refreshes every 2 mins.")
-
-# 5. Display Chapters
-# Find the FIRST available chapter number
+# 6. Display Chapters
 try:
     available_chapters = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
-    # Ensure it's treated as a number for the min() function
     next_up_chapter = pd.to_numeric(available_chapters['chapter']).min()
 except:
     next_up_chapter = None
@@ -179,14 +231,15 @@ for index, row in df.iterrows():
     
     with st.container():
         col1, col2, col3 = st.columns([1, 2, 2])
-        col1.write(f"**Juz {ch_num}**")
+        
+        # Chapter Number
+        col1.markdown(f"### Juz {ch_num}")
         
         if status in ["Available", "nan", "None", "", "nan"]:
             if ch_num == next_up_chapter:
-                # This part is NOT disabled - it stays bright/visible
-                col2.info("✨ **Available**")
-                
-                # ONLY the button is disabled based on name selection
+                # Always bright/visible
+                col2.info("✨ Available")
+                # Button disabled ONLY if name not picked
                 if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
                     df.at[index, 'status'] = 'Reserved'
                     df.at[index, 'user'] = selected_user
@@ -198,11 +251,9 @@ for index, row in df.iterrows():
         elif status == "Reserved":
             if assigned_user == selected_user:
                 col2.warning("🕒 Reading")
-                
-                # Create two sub-columns for the "Complete" and "Cancel" buttons
                 btn_col1, btn_col2 = col3.columns(2)
                 
-                if btn_col1.button("Complete", key=f"done_{ch_num}", use_container_width=True):
+                if btn_col1.button("Done", key=f"done_{ch_num}", use_container_width=True):
                     df.at[index, 'status'] = 'Completed'
                     k_num = (history_df['khatam_number'].max() if not history_df.empty else 0)
                     log = {
@@ -213,12 +264,10 @@ for index, row in df.iterrows():
                     }
                     safe_update(df, log)
                 
-                if btn_col2.button("Cancel", key=f"cancel_{ch_num}", use_container_width=True):
-                    # Reset back to available and clear user
+                if btn_col2.button("✖", key=f"cancel_{ch_num}", use_container_width=True):
                     df.at[index, 'status'] = 'Available'
                     df.at[index, 'user'] = ''
                     safe_update(df)
-                    
             else:
                 col2.error(f"👤 {assigned_user}")
                 col3.write("🔒 Reserved")
@@ -226,9 +275,6 @@ for index, row in df.iterrows():
         elif status == "Completed":
             col2.success(f"✅ {assigned_user}")
             col3.write("Completed")
-        
-        #st.divider()
 
-# --- FIXED AUTO REFRESH ---
-# Use st.markdown with the correct parameter: unsafe_allow_html=True
+# Auto Refresh
 st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
