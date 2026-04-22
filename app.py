@@ -6,10 +6,10 @@ from datetime import datetime
 
 st.set_page_config(page_title="Team 37 Chapter Tracker", page_icon="📖")
 
-# --- CUSTOM CSS ---
+# --- CONSOLIDATED CUSTOM CSS ---
 st.markdown("""
     <style>
-    
+        
     /* Main background */
     .stApp {
         background: linear-gradient(to bottom, #f0f2f6, #ffffff);
@@ -127,9 +127,19 @@ st.markdown("""
         .stHorizontalBlock .stColumn:nth-child(3) p {
             padding-bottom:10px;
         }
-    }       
+    }     
+
+    a {
+        color: rgb(49, 51, 63) !important;
+        text-decoration: none !important;
+    }
+    a:hover h3 {
+        text-decoration:underline !important;
+    }
+  
     </style>
     """, unsafe_allow_html=True)
+
 
 st.title("Team 37 Chapter Tracker")
 
@@ -161,8 +171,7 @@ def get_all_data():
 df, history_df = get_all_data()
 
 # --- 2. MAIN WINDOW USER SELECTION ---
-users_list = ["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"]
-users_list.sort()
+users_list = sorted(["Ghazi", "Fatima", "Fatiha", "Rahima", "Shahi", "Kalshuma", "Farhad", "Shamil", "Amina", "Sayeed", "Raju", "Ujjal", "Yanul", "Kamrul", "Mitha", "Habiba", "Shumi", "Shahana", "Gumana", "Waseem", "Yaasir", "Zafir", "Zuhair", "Zahra", "Maryam", "Dawood", "Yusuf", "Aqeel", "Umair", "Adam"])
 
 options = ["-- Select your name --"] + users_list
 selected_user = st.selectbox(" ", options)
@@ -215,8 +224,6 @@ if progress == 30:
         else:
             st.sidebar.error("Select your name first!")
 
-#st.write("---")
-
 # 6. Display Chapters
 try:
     available_chapters = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
@@ -230,16 +237,16 @@ for index, row in df.iterrows():
     assigned_user = str(row['user']).strip()
     
     with st.container():
+        # Using equal ratios helps with centering on desktop
         col1, col2, col3 = st.columns([1, 2, 2])
         
-        # Chapter Number
-        col1.markdown(f"### Juz {ch_num}")
+        # Col 1: Chapter Number Link
+        col1.markdown(f"<a href='https://quran.com/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3></a>", unsafe_allow_html=True)
         
+        # Col 2: Status Box
         if status in ["Available", "nan", "None", "", "nan"]:
             if ch_num == next_up_chapter:
-                # Always bright/visible
                 col2.info("✨ Available")
-                # Button disabled ONLY if name not picked
                 if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
                     df.at[index, 'status'] = 'Reserved'
                     df.at[index, 'user'] = selected_user
