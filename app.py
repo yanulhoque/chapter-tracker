@@ -253,7 +253,7 @@ for index, row in df.iterrows():
                 col2.warning("🕒 Reading")
                 btn_col1, btn_col2 = col3.columns(2)
                 
-                if btn_col1.button("Done", key=f"done_{ch_num}", use_container_width=True):
+                if btn_col1.button("Completed", key=f"done_{ch_num}", use_container_width=True):
                     df.at[index, 'status'] = 'Completed'
                     k_num = (history_df['khatam_number'].max() if not history_df.empty else 0)
                     log = {
@@ -264,7 +264,7 @@ for index, row in df.iterrows():
                     }
                     safe_update(df, log)
                 
-                if btn_col2.button("✖", key=f"cancel_{ch_num}", use_container_width=True):
+                if btn_col2.button("Unreserve", key=f"cancel_{ch_num}", use_container_width=True):
                     df.at[index, 'status'] = 'Available'
                     df.at[index, 'user'] = ''
                     safe_update(df)
