@@ -145,6 +145,48 @@ st.title("Team 37 Chapter Tracker")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+import streamlit.components.v1 as components
+
+def local_confetti():
+    # This script injects the library into the PARENT window and then runs it
+    components.html(
+        """
+        <script>
+            (function() {
+                var parentDoc = window.parent.document;
+                var scriptId = 'confetti-script';
+                
+                // 1. Check if the script is already in the parent head
+                if (!parentDoc.getElementById(scriptId)) {
+                    var script = parentDoc.createElement('script');
+                    script.id = scriptId;
+                    script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
+                    parentDoc.head.appendChild(script);
+                    
+                    // 2. Once it loads, fire the confetti
+                    script.onload = function() {
+                        window.parent.confetti({
+                            particleCount: 150,
+                            spread: 70,
+                            origin: { y: 0.6 },
+                            zIndex: 99999
+                        });
+                    };
+                } else {
+                    // 3. If already loaded, just fire it immediately
+                    window.parent.confetti({
+                        particleCount: 150,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        zIndex: 99999
+                    });
+                }
+            })();
+        </script>
+        """,
+        height=0,
+    )
+
 # 1. Load data with Caching
 def get_all_data():
     try:
@@ -222,7 +264,7 @@ if progress == 30:
             df['user'] = ''
             safe_update(df)
         else:
-            st.sidebar.error("Select your name first!")
+            st.sidebar.error("Please select your name first!")
 
 # 6. Display Chapters
 try:
@@ -261,6 +303,7 @@ for index, row in df.iterrows():
                 btn_col1, btn_col2 = col3.columns(2)
                 
                 if btn_col1.button("Completed", key=f"done_{ch_num}", use_container_width=True):
+                    local_confetti() # Added celebration here
                     df.at[index, 'status'] = 'Completed'
                     k_num = (history_df['khatam_number'].max() if not history_df.empty else 0)
                     log = {
