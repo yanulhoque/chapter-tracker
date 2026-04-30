@@ -3,6 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import time
 from datetime import datetime
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Team 37 Chapter Tracker", page_icon="📖")
 
@@ -52,7 +53,6 @@ st.markdown("""
     
     /* Main Selectbox Centering */
     [data-testid="stSelectbox"] {
-        
         margin: 0 auto;
     }
 
@@ -61,7 +61,6 @@ st.markdown("""
         background-color: white;
         border-radius: 5px;
         padding: 5px 10px 0 10px;
-        /*box-shadow: 0 2px 4px rgba(0,0,0,0.05);*/
         margin-bottom: 0;
     }
 
@@ -71,13 +70,13 @@ st.markdown("""
         font-weight: bold;
     }
             
-/* Hide the anchor link next to headings */
-.st-emotion-cache-gi0tri {
-    display: none !important;
-}
+    /* Hide the anchor link next to headings */
+    .st-emotion-cache-gi0tri {
+        display: none !important;
+    }
     /* 1. Adjust the vertical gap between elements inside the same column */
     [data-testid="stVerticalBlock"] {
-        gap: 1rem !important; /* Change this value to adjust spacing */
+        gap: 1rem !important; 
     }
 
     /* 2. Remove extra padding from the top of the columns */
@@ -90,7 +89,7 @@ st.markdown("""
     .stAlert {
         margin-top: 0px !important;
         margin-bottom: 0px !important;
-        padding: 10px !important; /* Makes the user name box more compact */
+        padding: 10px !important; 
     }
 
     /* 4. Center the text within the Alert box to match the Juz number */
@@ -106,15 +105,15 @@ st.markdown("""
         justify-content: center;
     }
             
-        /* Vertical Centering: This aligns content to the middle of the card's height */
+    /* Vertical Centering */
     [data-testid="stColumn"] > div {
         display: flex;
         flex-direction: column;
         justify-content: center;
-        height: 100%; /* Ensures the column takes up the full height of the card */
+        height: 100%; 
     }
 
-    /* Extra safety: Ensure the vertical block inside also centers its children */
+    /* Extra safety */
     [data-testid="stColumn"] [data-testid="stVerticalBlock"] {
         justify-content: center !important;
         height: 100% !important;
@@ -137,6 +136,29 @@ st.markdown("""
         text-decoration:underline !important;
     }
   
+
+    /* --- Sidebar Button Styling (Only shows when needed) --- */
+    section[data-testid="stSidebar"] .stButton > button {
+        border: 1px solid white !important;
+        font-weight: bold !important;
+        margin-top: 20px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        background-color: transparent;
+    }
+
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background-color:transparent!important;
+            box-shadow: 0 6px 8px rgba(0,0,0,0.3);
+        text-decoration: underline;
+    }
+
+    /* Success message styling in sidebar */
+    section[data-testid="stSidebar"] .stAlert {
+        color: white !important;
+        padding:0!important;
+        margin-top: 10px !important;
+        margin-bottom: 0px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -145,41 +167,24 @@ st.title("Team 37 Chapter Tracker")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-import streamlit.components.v1 as components
-
+# --- CONFETTI FUNCTION ---
 def local_confetti():
-    # This script injects the library into the PARENT window and then runs it
     components.html(
         """
         <script>
             (function() {
                 var parentDoc = window.parent.document;
                 var scriptId = 'confetti-script';
-                
-                // 1. Check if the script is already in the parent head
                 if (!parentDoc.getElementById(scriptId)) {
                     var script = parentDoc.createElement('script');
                     script.id = scriptId;
                     script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
                     parentDoc.head.appendChild(script);
-                    
-                    // 2. Once it loads, fire the confetti
                     script.onload = function() {
-                        window.parent.confetti({
-                            particleCount: 150,
-                            spread: 70,
-                            origin: { y: 0.6 },
-                            zIndex: 99999
-                        });
+                        window.parent.confetti({particleCount: 150, spread: 70, origin: { y: 0.6 }, zIndex: 99999});
                     };
                 } else {
-                    // 3. If already loaded, just fire it immediately
-                    window.parent.confetti({
-                        particleCount: 150,
-                        spread: 70,
-                        origin: { y: 0.6 },
-                        zIndex: 99999
-                    });
+                    window.parent.confetti({particleCount: 150, spread: 70, origin: { y: 0.6 }, zIndex: 99999});
                 }
             })();
         </script>
@@ -191,7 +196,12 @@ def local_confetti():
 def get_all_data():
     try:
         df = conn.read(worksheet="Sheet1", ttl=10)
+        # Ensure khatam_no exists
+        if 'khatam_no' not in df.columns:
+            df['khatam_no'] = 1
+            
         df['chapter'] = pd.to_numeric(df['chapter'], errors='coerce').fillna(0).astype(int)
+        df['khatam_no'] = pd.to_numeric(df['khatam_no'], errors='coerce').fillna(1).astype(int)
         df['status'] = df['status'].astype(str)
         df['user'] = df['user'].astype(str)
         
@@ -238,7 +248,7 @@ else:
 
 completed_chapters = df[df['status'].str.contains('Completed', na=False)]
 progress = len(completed_chapters)
-st.sidebar.write(f"**Current Khatam:** {progress} / 30 Juz")
+st.sidebar.write(f"**Total Juz Completed:** {progress}")
 
 # 4. Update Function
 def safe_update(main_df, log_entry=None):
@@ -255,76 +265,108 @@ def safe_update(main_df, log_entry=None):
     except Exception as e:
         st.error(f"Update failed: {e}")
 
-# 5. Reset Logic
-if progress == 30:
-    st.balloons()
-    if st.sidebar.button("🎉 Start New Khatam"):
+# --- 5. START NEW KHATAM (ROBUST VERSION) ---
+available_anywhere = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
+
+if available_anywhere.empty:
+    st.sidebar.success("🎉 All Juz have been claimed!")
+    
+    if st.sidebar.button("Start Additional Khatam", use_container_width=True):
         if user_is_identified:
-            df['status'] = 'Available'
-            df['user'] = ''
-            safe_update(df)
+            try:
+                # 1. Determine current Khatam number
+                if 'khatam_no' in df.columns:
+                    current_max = pd.to_numeric(df['khatam_no'], errors='coerce').max()
+                    next_k_no = int(current_max + 1) if not pd.isna(current_max) else 2
+                else:
+                    next_k_no = 2
+                
+                # 2. Create the 30 new rows
+                new_rows = pd.DataFrame({
+                    'chapter': list(range(1, 31)),
+                    'status': ['Available'] * 30,
+                    'user': [''] * 30,
+                    'khatam_no': [next_k_no] * 30
+                })
+                
+                # 3. Combine and sync
+                # We use ignore_index to keep the row ordering clean
+                updated_df = pd.concat([df, new_rows], ignore_index=True)
+                
+                # 4. Immediate Sync
+                with st.spinner("Writing to Google Sheets..."):
+                    conn.update(worksheet="Sheet1", data=updated_df)
+                    st.cache_data.clear() # Wipe the cache so it sees the new rows
+                    time.sleep(2)         # Give Google a moment to breathe
+                    st.rerun()            # Force the app to reload
+                    
+            except Exception as e:
+                st.sidebar.error(f"Error starting new khatam: {e}")
         else:
             st.sidebar.error("Please select your name first!")
 
-# 6. Display Chapters
-try:
-    available_chapters = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
-    next_up_chapter = pd.to_numeric(available_chapters['chapter']).min()
-except:
-    next_up_chapter = None
+# --- 6. DISPLAY CHAPTERS (FILTERED) ---
+st.write("### Active Juz List")
 
-for index, row in df.iterrows():
-    ch_num = int(row['chapter'])
-    status = str(row['status']).strip()
-    assigned_user = str(row['user']).strip()
-    
-    with st.container():
-        # Using equal ratios helps with centering on desktop
-        col1, col2, col3 = st.columns([1, 2, 2])
+# We only show Juz that aren't completed yet
+active_df = df[df['status'] != 'Completed'].copy()
+
+if active_df.empty:
+    st.success("All active Khatams are complete! Use the Admin panel to start a new one.")
+else:
+    # Logic to find the earliest available row among active ones
+    available_rows = active_df[active_df['status'].isin(["Available", "nan", "None", "", "nan"])]
+    next_up_idx = available_rows.index.min() if not available_rows.empty else None
+
+    for index, row in active_df.iterrows():
+        ch_num = int(row['chapter'])
+        status = str(row['status']).strip()
+        assigned_user = str(row['user']).strip()
+        k_no = int(row['khatam_no'])
         
-        # Col 1: Chapter Number Link
-        col1.markdown(f"<a href='https://quran.com/juz/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3></a>", unsafe_allow_html=True)
-        
-        # Col 2: Status Box
-        if status in ["Available", "nan", "None", "", "nan"]:
-            if ch_num == next_up_chapter:
-                col2.info("✨ Available")
-                if col3.button("Reserve", key=f"res_{ch_num}", use_container_width=True, disabled=not user_is_identified):
-                    df.at[index, 'status'] = 'Reserved'
-                    df.at[index, 'user'] = selected_user
-                    safe_update(df)
-            else:
-                col2.caption("⚪ Unavailable")
-                col3.write("")
-                
-        elif status == "Reserved":
-            if assigned_user == selected_user:
-                col2.warning("🕒 Reading")
-                btn_col1, btn_col2 = col3.columns(2)
-                
-                if btn_col1.button("Completed", key=f"done_{ch_num}", use_container_width=True):
-                    local_confetti() # Added celebration here
-                    df.at[index, 'status'] = 'Completed'
-                    k_num = (history_df['khatam_number'].max() if not history_df.empty else 0)
-                    log = {
-                        'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        'user': selected_user,
-                        'chapter': ch_num,
-                        'khatam_number': k_num if progress < 29 else k_num + 1
-                    }
-                    safe_update(df, log)
-                
-                if btn_col2.button("Unreserve", key=f"cancel_{ch_num}", use_container_width=True):
-                    df.at[index, 'status'] = 'Available'
-                    df.at[index, 'user'] = ''
-                    safe_update(df)
-            else:
-                col2.error(f"👤 {assigned_user}")
-                col3.write("🔒 Reserved")
-                
-        elif status == "Completed":
-            col2.success(f"✅ {assigned_user}")
-            col3.write("Completed")
+        with st.container():
+            col1, col2, col3 = st.columns([1, 2, 2])
+            
+            # Col 1: Chapter Number Link + Khatam Number
+            col1.markdown(f"<a href='https://quran.com/juz/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3><p style='font-size:0.8rem; color:gray;'>(Khatam #{k_no})</p></a>", unsafe_allow_html=True)
+            
+            # Col 2: Status Box
+            if status in ["Available", "nan", "None", "", "nan"]:
+                if index == next_up_idx:
+                    col2.info("✨ Available")
+                    if col3.button("Reserve", key=f"res_{index}", use_container_width=True, disabled=not user_is_identified):
+                        df.at[index, 'status'] = 'Reserved'
+                        df.at[index, 'user'] = selected_user
+                        safe_update(df)
+                else:
+                    col2.caption("⚪ Waiting")
+                    col3.write("")
+                    
+            elif status == "Reserved":
+                if assigned_user == selected_user:
+                    col2.warning("🕒 Reading")
+                    btn_col1, btn_col2 = col3.columns(2)
+                    
+                    if btn_col1.button("Completed", key=f"done_{index}", use_container_width=True):
+                        local_confetti()
+                        df.at[index, 'status'] = 'Completed'
+                        # Use History to find the current khatam count for the user
+                        k_num = history_df['khatam_number'].max() if not history_df.empty else 0
+                        log = {
+                            'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            'user': selected_user,
+                            'chapter': ch_num,
+                            'khatam_number': k_no # Log the specific khatam number
+                        }
+                        safe_update(df, log)
+                    
+                    if btn_col2.button("Unreserve", key=f"cancel_{index}", use_container_width=True):
+                        df.at[index, 'status'] = 'Available'
+                        df.at[index, 'user'] = ''
+                        safe_update(df)
+                else:
+                    col2.error(f"👤 {assigned_user}")
+                    col3.write("🔒 Reserved")
 
 # Auto Refresh
 st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
