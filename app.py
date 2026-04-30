@@ -339,7 +339,7 @@ else:
                         df.at[index, 'user'] = selected_user
                         safe_update(df)
                 else:
-                    col2.caption("⚪ Waiting")
+                    col2.caption("⚪ Unavailable")
                     col3.write("")
                     
             elif status == "Reserved":
