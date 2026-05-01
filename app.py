@@ -23,23 +23,12 @@ st.markdown("""
     }
     [data-testid="stSidebar"] p, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
         color: white !important;
+        justify-content: left;
     }
     
-    /* Stats Table in Sidebar */
-    section[data-testid="stSidebar"] .stTable {
-        border-radius: 10px;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.2);
-        background-color: rgba(255,255,255,0.1) !important;
-    }
-    section[data-testid="stSidebar"] thead th {
-        color: white !important;
-        text-align: left !important;
-    }
-    section[data-testid="stSidebar"] td {
-        color: white !important;
-        background-color: transparent !important;
-        text-align: left !important;
+    /* Stats Styling in Sidebar */
+    section[data-testid="stSidebar"] .stMarkdown {
+        line-height: 1.6;
     }
 
     /* CENTER EVERYTHING in the main Juz list */
@@ -228,33 +217,41 @@ if not user_is_identified:
 else:
     st.info(f"Assalamu Alaikum, **{selected_user}**! Page auto-refreshes every 2 mins.")
 
-# --- 3. SIDEBAR STATS (WITH MEDALS) ---
+# --- 3. SIDEBAR STATS (TOP 10 PODIUM STYLE) ---
 if not history_df.empty:
     khatam_counts = history_df['khatam_number'].value_counts()
     full_khatams = (khatam_counts >= 30).sum()
     
-    st.sidebar.write("### 🏆 Top Readers")
+    st.sidebar.write("### 🏆 Top 10 Readers")
     
-    # Generate Leaderboard
-    leaderboard = history_df['user'].value_counts().reset_index()
-    leaderboard.columns = ['Name', 'Juz Completed']
+    # Group names by their score
+    counts = history_df['user'].value_counts()
+    score_map = {}
+    for name, score in counts.items():
+        score_map.setdefault(score, []).append(name)
     
-    # Add Medals to the top 3
-    def assign_medal(index, name):
-        if index == 0: return f"🥇 {name}"
-        if index == 1: return f"🥈 {name}"
-        if index == 2: return f"🥉 {name}"
-        return name
-
-    leaderboard['Name'] = [assign_medal(i, name) for i, name in enumerate(leaderboard['Name'])]
+    # Sort scores descending
+    sorted_scores = sorted(score_map.keys(), reverse=True)
+    medals = ["🥇", "🥈", "🥉"]
     
-    leaderboard.index = leaderboard.index + 1
-    st.sidebar.table(leaderboard)
+    # Display Top 10 Score-Ranks with the requested alignment
+    for i in range(min(len(sorted_scores), 10)):
+        score = sorted_scores[i]
+        names_list = sorted(score_map[score]) # Sort names alphabetically within same score
+        names_str = ", ".join(names_list)
+        
+        # Determine prefix (Medal for top 3, number for others)
+        prefix = medals[i] if i < 3 else f"{i+1}."
+        
+        # Combined line: Rank [Score] Juz - [Names]
+        st.sidebar.markdown(f"{prefix} **{int(score)} Juz** — {names_str}")
+    
+    st.sidebar.markdown("---")
     st.sidebar.write(f"**Total Khatams Completed:** {int(full_khatams)}")
 else:
     st.sidebar.write("No history recorded yet.")
 
-# Latest Khatam Progress
+# Progress of the latest Khatam
 latest_k_no = df['khatam_no'].max()
 completed_in_latest = len(df[(df['khatam_no'] == latest_k_no) & (df['status'] == 'Completed')])
 st.sidebar.write(f"**Latest Khatam Progress:** {completed_in_latest} / 30")
@@ -295,22 +292,17 @@ if available_anywhere.empty:
             st.sidebar.error("Select your name first!")
 
 # --- 6. DISPLAY CHAPTERS (HYBRID VIEW) ---
-# Logic: Find the absolute next Juz to read across all batches
 available_rows = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
 next_up_idx = available_rows.index.min() if not available_rows.empty else None
 
 for k_num in sorted(df['khatam_no'].unique()):
     khatam_subset = df[df['khatam_no'] == k_num]
     
-    # FILTER LOGIC:
-    # If this is an OLD khatam, only show the Juz that are not 'Completed'
-    # If this is the LATEST khatam, show everything.
     if k_num < latest_k_no:
         display_subset = khatam_subset[khatam_subset['status'] != 'Completed']
     else:
         display_subset = khatam_subset
 
-    # Only show the section header if there are Juz to display
     if not display_subset.empty:
         st.write(f"### Khatam #{k_num}")
 
