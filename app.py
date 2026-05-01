@@ -135,30 +135,25 @@ st.markdown("""
     a:hover h3 {
         text-decoration:underline !important;
     }
-  
 
-    /* --- Sidebar Button Styling (Only shows when needed) --- */
+    /* Sidebar Button Styling (Only shows when needed) */
     section[data-testid="stSidebar"] .stButton > button {
+        background-color: white !important;
+        color: #1E3A8A !important;
         border: 1px solid white !important;
         font-weight: bold !important;
         margin-top: 20px !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-        background-color: transparent;
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
-        background-color:transparent!important;
-            box-shadow: 0 6px 8px rgba(0,0,0,0.3);
-        text-decoration: underline;
+        background-color: #f0f2f6 !important; /* Light gray */
+        color: #1E3A8A !important;
+        border: 1px solid #f0f2f6 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 8px rgba(0,0,0,0.3);
     }
-
-    /* Success message styling in sidebar */
-    section[data-testid="stSidebar"] .stAlert {
-        color: white !important;
-        padding:0!important;
-        margin-top: 10px !important;
-        margin-bottom: 0px !important;
-    }
+  
     </style>
     """, unsafe_allow_html=True)
 
@@ -234,21 +229,26 @@ if not user_is_identified:
 else:
     st.info(f"Assalamu Alaikum, **{selected_user}**! Page auto-refreshes every 2 mins.")
 
-# --- 3. SIDEBAR STATS ---
+# --- 3. SIDEBAR STATS (FIXED CALCULATION) ---
 if not history_df.empty:
-    total_khatams = history_df['khatam_number'].max() if 'khatam_number' in history_df.columns else 0
+    # UPDATED LOGIC: Count unique khatam_numbers that have 30 entries (full completion)
+    # This prevents it showing "2" just because you started the second one.
+    khatam_counts = history_df['khatam_number'].value_counts()
+    full_khatams = (khatam_counts >= 30).sum()
+    
     st.sidebar.write("### 🏆 Top Readers")
     leaderboard = history_df['user'].value_counts().reset_index()
     leaderboard.columns = ['Name', 'Juz Completed']
     leaderboard.index = leaderboard.index + 1
     st.sidebar.table(leaderboard)
-    st.sidebar.write(f"**Total Khatams Completed:** {int(total_khatams)}")
+    st.sidebar.write(f"**Total Khatams Completed:** {int(full_khatams)}")
 else:
     st.sidebar.write("No history recorded yet.")
 
-completed_chapters = df[df['status'].str.contains('Completed', na=False)]
-progress = len(completed_chapters)
-st.sidebar.write(f"**Total Juz Completed:** {progress}")
+# --- SIDEBAR PROGRESS (LATEST KHATAM ONLY) ---
+latest_k_no = df['khatam_no'].max()
+completed_in_latest = len(df[(df['khatam_no'] == latest_k_no) & (df['status'] == 'Completed')])
+st.sidebar.write(f"**Latest Khatam Progress:** {completed_in_latest} / 30")
 
 # 4. Update Function
 def safe_update(main_df, log_entry=None):
@@ -265,56 +265,32 @@ def safe_update(main_df, log_entry=None):
     except Exception as e:
         st.error(f"Update failed: {e}")
 
-# --- 5. START NEW KHATAM (ROBUST VERSION) ---
+# --- 5. START NEW KHATAM (APPEND LOGIC) ---
 available_anywhere = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
 
 if available_anywhere.empty:
     st.sidebar.success("🎉 All Juz have been claimed!")
-    
     if st.sidebar.button("Start Additional Khatam", use_container_width=True):
         if user_is_identified:
-            try:
-                # 1. Determine current Khatam number
-                if 'khatam_no' in df.columns:
-                    current_max = pd.to_numeric(df['khatam_no'], errors='coerce').max()
-                    next_k_no = int(current_max + 1) if not pd.isna(current_max) else 2
-                else:
-                    next_k_no = 2
-                
-                # 2. Create the 30 new rows
-                new_rows = pd.DataFrame({
-                    'chapter': list(range(1, 31)),
-                    'status': ['Available'] * 30,
-                    'user': [''] * 30,
-                    'khatam_no': [next_k_no] * 30
-                })
-                
-                # 3. Combine and sync
-                # We use ignore_index to keep the row ordering clean
-                updated_df = pd.concat([df, new_rows], ignore_index=True)
-                
-                # 4. Immediate Sync
-                with st.spinner("Writing to Google Sheets..."):
-                    conn.update(worksheet="Sheet1", data=updated_df)
-                    st.cache_data.clear() # Wipe the cache so it sees the new rows
-                    time.sleep(2)         # Give Google a moment to breathe
-                    st.rerun()            # Force the app to reload
-                    
-            except Exception as e:
-                st.sidebar.error(f"Error starting new khatam: {e}")
+            next_k_no = int(df['khatam_no'].max() + 1)
+            new_rows = pd.DataFrame({
+                'chapter': list(range(1, 31)),
+                'status': ['Available'] * 30,
+                'user': [''] * 30,
+                'khatam_no': [next_k_no] * 30
+            })
+            updated_df = pd.concat([df, new_rows], ignore_index=True)
+            safe_update(updated_df)
         else:
             st.sidebar.error("Please select your name first!")
 
 # --- 6. DISPLAY CHAPTERS (FILTERED) ---
 st.write("### Active Juz List")
-
-# We only show Juz that aren't completed yet
 active_df = df[df['status'] != 'Completed'].copy()
 
 if active_df.empty:
-    st.success("All active Khatams are complete! Use the Admin panel to start a new one.")
+    st.success("All active Khatams are finished! Use the sidebar to start a new one.")
 else:
-    # Logic to find the earliest available row among active ones
     available_rows = active_df[active_df['status'].isin(["Available", "nan", "None", "", "nan"])]
     next_up_idx = available_rows.index.min() if not available_rows.empty else None
 
@@ -326,11 +302,8 @@ else:
         
         with st.container():
             col1, col2, col3 = st.columns([1, 2, 2])
-            
-            # Col 1: Chapter Number Link + Khatam Number
             col1.markdown(f"<a href='https://quran.com/juz/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3><p style='font-size:0.8rem; color:gray;'>(Khatam #{k_no})</p></a>", unsafe_allow_html=True)
             
-            # Col 2: Status Box
             if status in ["Available", "nan", "None", "", "nan"]:
                 if index == next_up_idx:
                     col2.info("✨ Available")
@@ -339,24 +312,21 @@ else:
                         df.at[index, 'user'] = selected_user
                         safe_update(df)
                 else:
-                    col2.caption("⚪ Unavailable")
+                    col2.caption("⚪ Waiting")
                     col3.write("")
                     
             elif status == "Reserved":
                 if assigned_user == selected_user:
                     col2.warning("🕒 Reading")
                     btn_col1, btn_col2 = col3.columns(2)
-                    
                     if btn_col1.button("Completed", key=f"done_{index}", use_container_width=True):
                         local_confetti()
                         df.at[index, 'status'] = 'Completed'
-                        # Use History to find the current khatam count for the user
-                        k_num = history_df['khatam_number'].max() if not history_df.empty else 0
                         log = {
                             'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
                             'user': selected_user,
                             'chapter': ch_num,
-                            'khatam_number': k_no # Log the specific khatam number
+                            'khatam_number': k_no 
                         }
                         safe_update(df, log)
                     
