@@ -228,21 +228,33 @@ if not user_is_identified:
 else:
     st.info(f"Assalamu Alaikum, **{selected_user}**! Page auto-refreshes every 2 mins.")
 
-# --- 3. SIDEBAR STATS ---
+# --- 3. SIDEBAR STATS (WITH MEDALS) ---
 if not history_df.empty:
     khatam_counts = history_df['khatam_number'].value_counts()
     full_khatams = (khatam_counts >= 30).sum()
     
     st.sidebar.write("### 🏆 Top Readers")
+    
+    # Generate Leaderboard
     leaderboard = history_df['user'].value_counts().reset_index()
     leaderboard.columns = ['Name', 'Juz Completed']
+    
+    # Add Medals to the top 3
+    def assign_medal(index, name):
+        if index == 0: return f"🥇 {name}"
+        if index == 1: return f"🥈 {name}"
+        if index == 2: return f"🥉 {name}"
+        return name
+
+    leaderboard['Name'] = [assign_medal(i, name) for i, name in enumerate(leaderboard['Name'])]
+    
     leaderboard.index = leaderboard.index + 1
     st.sidebar.table(leaderboard)
     st.sidebar.write(f"**Total Khatams Completed:** {int(full_khatams)}")
 else:
     st.sidebar.write("No history recorded yet.")
 
-# Progress of the active (latest) Khatam
+# Latest Khatam Progress
 latest_k_no = df['khatam_no'].max()
 completed_in_latest = len(df[(df['khatam_no'] == latest_k_no) & (df['status'] == 'Completed')])
 st.sidebar.write(f"**Latest Khatam Progress:** {completed_in_latest} / 30")
