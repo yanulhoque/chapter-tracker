@@ -136,7 +136,7 @@ st.markdown("""
         text-decoration:underline !important;
     }
 
-    /* Sidebar Button Styling (Only shows when needed) */
+    /* Sidebar Button Styling */
     section[data-testid="stSidebar"] .stButton > button {
         background-color: white !important;
         color: #1E3A8A !important;
@@ -147,7 +147,7 @@ st.markdown("""
     }
 
     section[data-testid="stSidebar"] .stButton > button:hover {
-        background-color: #f0f2f6 !important; /* Light gray */
+        background-color: #f0f2f6 !important;
         color: #1E3A8A !important;
         border: 1px solid #f0f2f6 !important;
         transform: translateY(-1px);
@@ -191,7 +191,6 @@ def local_confetti():
 def get_all_data():
     try:
         df = conn.read(worksheet="Sheet1", ttl=10)
-        # Ensure khatam_no exists
         if 'khatam_no' not in df.columns:
             df['khatam_no'] = 1
             
@@ -229,10 +228,8 @@ if not user_is_identified:
 else:
     st.info(f"Assalamu Alaikum, **{selected_user}**! Page auto-refreshes every 2 mins.")
 
-# --- 3. SIDEBAR STATS (FIXED CALCULATION) ---
+# --- 3. SIDEBAR STATS ---
 if not history_df.empty:
-    # UPDATED LOGIC: Count unique khatam_numbers that have 30 entries (full completion)
-    # This prevents it showing "2" just because you started the second one.
     khatam_counts = history_df['khatam_number'].value_counts()
     full_khatams = (khatam_counts >= 30).sum()
     
@@ -245,7 +242,7 @@ if not history_df.empty:
 else:
     st.sidebar.write("No history recorded yet.")
 
-# --- SIDEBAR PROGRESS (LATEST KHATAM ONLY) ---
+# Progress of the active (latest) Khatam
 latest_k_no = df['khatam_no'].max()
 completed_in_latest = len(df[(df['khatam_no'] == latest_k_no) & (df['status'] == 'Completed')])
 st.sidebar.write(f"**Latest Khatam Progress:** {completed_in_latest} / 30")
@@ -265,11 +262,12 @@ def safe_update(main_df, log_entry=None):
     except Exception as e:
         st.error(f"Update failed: {e}")
 
-# --- 5. START NEW KHATAM (APPEND LOGIC) ---
+# --- 5. START NEW KHATAM BUTTON ---
 available_anywhere = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
 
 if available_anywhere.empty:
     st.sidebar.success("🎉 All Juz have been claimed!")
+    
     if st.sidebar.button("Start Additional Khatam", use_container_width=True):
         if user_is_identified:
             next_k_no = int(df['khatam_no'].max() + 1)
@@ -282,61 +280,74 @@ if available_anywhere.empty:
             updated_df = pd.concat([df, new_rows], ignore_index=True)
             safe_update(updated_df)
         else:
-            st.sidebar.error("Please select your name first!")
+            st.sidebar.error("Select your name first!")
 
-# --- 6. DISPLAY CHAPTERS (FILTERED) ---
-st.write("### Active Juz List")
-active_df = df[df['status'] != 'Completed'].copy()
+# --- 6. DISPLAY CHAPTERS (HYBRID VIEW) ---
+# Logic: Find the absolute next Juz to read across all batches
+available_rows = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
+next_up_idx = available_rows.index.min() if not available_rows.empty else None
 
-if active_df.empty:
-    st.success("All active Khatams are finished! Use the sidebar to start a new one.")
-else:
-    available_rows = active_df[active_df['status'].isin(["Available", "nan", "None", "", "nan"])]
-    next_up_idx = available_rows.index.min() if not available_rows.empty else None
+for k_num in sorted(df['khatam_no'].unique()):
+    khatam_subset = df[df['khatam_no'] == k_num]
+    
+    # FILTER LOGIC:
+    # If this is an OLD khatam, only show the Juz that are not 'Completed'
+    # If this is the LATEST khatam, show everything.
+    if k_num < latest_k_no:
+        display_subset = khatam_subset[khatam_subset['status'] != 'Completed']
+    else:
+        display_subset = khatam_subset
 
-    for index, row in active_df.iterrows():
-        ch_num = int(row['chapter'])
-        status = str(row['status']).strip()
-        assigned_user = str(row['user']).strip()
-        k_no = int(row['khatam_no'])
-        
-        with st.container():
-            col1, col2, col3 = st.columns([1, 2, 2])
-            col1.markdown(f"<a href='https://quran.com/juz/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3><p style='font-size:0.8rem; color:gray;'>(Khatam #{k_no})</p></a>", unsafe_allow_html=True)
+    # Only show the section header if there are Juz to display
+    if not display_subset.empty:
+        st.write(f"### Khatam #{k_num}")
+
+        for index, row in display_subset.iterrows():
+            ch_num = int(row['chapter'])
+            status = str(row['status']).strip()
+            assigned_user = str(row['user']).strip()
             
-            if status in ["Available", "nan", "None", "", "nan"]:
-                if index == next_up_idx:
-                    col2.info("✨ Available")
-                    if col3.button("Reserve", key=f"res_{index}", use_container_width=True, disabled=not user_is_identified):
-                        df.at[index, 'status'] = 'Reserved'
-                        df.at[index, 'user'] = selected_user
-                        safe_update(df)
-                else:
-                    col2.caption("⚪ Waiting")
-                    col3.write("")
-                    
-            elif status == "Reserved":
-                if assigned_user == selected_user:
-                    col2.warning("🕒 Reading")
-                    btn_col1, btn_col2 = col3.columns(2)
-                    if btn_col1.button("Completed", key=f"done_{index}", use_container_width=True):
-                        local_confetti()
-                        df.at[index, 'status'] = 'Completed'
-                        log = {
-                            'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            'user': selected_user,
-                            'chapter': ch_num,
-                            'khatam_number': k_no 
-                        }
-                        safe_update(df, log)
-                    
-                    if btn_col2.button("Unreserve", key=f"cancel_{index}", use_container_width=True):
-                        df.at[index, 'status'] = 'Available'
-                        df.at[index, 'user'] = ''
-                        safe_update(df)
-                else:
-                    col2.error(f"👤 {assigned_user}")
-                    col3.write("🔒 Reserved")
+            with st.container():
+                col1, col2, col3 = st.columns([1, 2, 2])
+                col1.markdown(f"<a href='https://quran.com/juz/{ch_num}' target='_blank'><h3>Juz {ch_num} 🔗</h3></a>", unsafe_allow_html=True)
+                
+                if status in ["Available", "nan", "None", "", "nan"]:
+                    if index == next_up_idx:
+                        col2.info("✨ Available")
+                        if col3.button("Reserve", key=f"res_{index}", use_container_width=True, disabled=not user_is_identified):
+                            df.at[index, 'status'] = 'Reserved'
+                            df.at[index, 'user'] = selected_user
+                            safe_update(df)
+                    else:
+                        col2.caption("⚪ Unavailable")
+                        col3.write("")
+                        
+                elif status == "Reserved":
+                    if assigned_user == selected_user:
+                        col2.warning("🕒 Reading")
+                        btn_col1, btn_col2 = col3.columns(2)
+                        if btn_col1.button("Completed", key=f"done_{index}", use_container_width=True):
+                            local_confetti()
+                            df.at[index, 'status'] = 'Completed'
+                            log = {
+                                'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                'user': selected_user,
+                                'chapter': ch_num,
+                                'khatam_number': k_num 
+                            }
+                            safe_update(df, log)
+                        
+                        if btn_col2.button("Unreserve", key=f"cancel_{index}", use_container_width=True):
+                            df.at[index, 'status'] = 'Available'
+                            df.at[index, 'user'] = ''
+                            safe_update(df)
+                    else:
+                        col2.error(f"👤 {assigned_user}")
+                        col3.write("🔒 Reserved")
+                        
+                elif status == "Completed":
+                    col2.success(f"✅ {assigned_user}")
+                    col3.write("Completed")
 
 # Auto Refresh
 st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
