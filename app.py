@@ -25,6 +25,9 @@ st.markdown("""
         color: white !important;
         justify-content: left;
     }
+    [data-testid="stSidebar"] [kind="secondary"] p {
+        color: #000 !important;
+    }
     
     /* Stats Styling in Sidebar */
     section[data-testid="stSidebar"] .stMarkdown {
@@ -190,6 +193,9 @@ def get_all_data():
         
         try:
             history_df = conn.read(worksheet="History", ttl=60)
+            # Force numeric for math safety
+            history_df['chapter'] = pd.to_numeric(history_df['chapter'], errors='coerce')
+            history_df['khatam_number'] = pd.to_numeric(history_df['khatam_number'], errors='coerce')
         except:
             history_df = pd.DataFrame(columns=['date', 'user', 'chapter', 'khatam_number'])
             
@@ -217,10 +223,11 @@ if not user_is_identified:
 else:
     st.info(f"Assalamu Alaikum, **{selected_user}**! Page auto-refreshes every 2 mins.")
 
-# --- 3. SIDEBAR STATS (TOP 10 PODIUM STYLE) ---
+# --- 3. SIDEBAR STATS (COMPACT PODIUM ALIGNMENT) ---
 if not history_df.empty:
-    khatam_counts = history_df['khatam_number'].value_counts()
-    full_khatams = (khatam_counts >= 30).sum()
+    # REFINED MATH: Count a Khatam as complete only if it has 30 unique chapters recorded
+    khatam_progress = history_df.groupby('khatam_number')['chapter'].nunique()
+    full_khatams = (khatam_progress >= 30).sum()
     
     st.sidebar.write("### 🏆 Top 10 Readers")
     
@@ -230,20 +237,19 @@ if not history_df.empty:
     for name, score in counts.items():
         score_map.setdefault(score, []).append(name)
     
-    # Sort scores descending
+    # Sort unique scores descending
     sorted_scores = sorted(score_map.keys(), reverse=True)
     medals = ["🥇", "🥈", "🥉"]
     
-    # Display Top 10 Score-Ranks with the requested alignment
+    # Display Score-Ranks with joint alignment
     for i in range(min(len(sorted_scores), 10)):
         score = sorted_scores[i]
-        names_list = sorted(score_map[score]) # Sort names alphabetically within same score
+        names_list = sorted(score_map[score]) 
         names_str = ", ".join(names_list)
         
-        # Determine prefix (Medal for top 3, number for others)
         prefix = medals[i] if i < 3 else f"{i+1}."
         
-        # Combined line: Rank [Score] Juz - [Names]
+        # Compact single-line alignment: Medal **Score Juz** — Name1, Name2
         st.sidebar.markdown(f"{prefix} **{int(score)} Juz** — {names_str}")
     
     st.sidebar.markdown("---")
@@ -277,7 +283,7 @@ available_anywhere = df[df['status'].isin(["Available", "nan", "None", "", "nan"
 if available_anywhere.empty:
     st.sidebar.success("🎉 All Juz have been claimed!")
     
-    if st.sidebar.button("Start Additional Khatam", use_container_width=True):
+    if st.sidebar.button("Start the next Khatam", use_container_width=True):
         if user_is_identified:
             next_k_no = int(df['khatam_no'].max() + 1)
             new_rows = pd.DataFrame({
@@ -298,6 +304,7 @@ next_up_idx = available_rows.index.min() if not available_rows.empty else None
 for k_num in sorted(df['khatam_no'].unique()):
     khatam_subset = df[df['khatam_no'] == k_num]
     
+    # OLD: Show incomplete only | LATEST: Show all
     if k_num < latest_k_no:
         display_subset = khatam_subset[khatam_subset['status'] != 'Completed']
     else:
