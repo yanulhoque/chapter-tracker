@@ -223,37 +223,31 @@ if not user_is_identified:
 else:
     st.info(f"Assalamu Alaikum, **{selected_user}**! Page auto-refreshes every 2 mins.")
 
-# --- 3. SIDEBAR STATS (COMPACT PODIUM ALIGNMENT) ---
+# --- 3. SIDEBAR STATS ---
 if not history_df.empty:
-    # REFINED MATH: Count a Khatam as complete only if it has 30 unique chapters recorded
-    khatam_progress = history_df.groupby('khatam_number')['chapter'].nunique()
-    full_khatams = (khatam_progress >= 30).sum()
+    # UPDATED MATH: Row-based count is the most reliable way to handle ID fragmentation.
+    full_khatams_count = len(history_df) // 30
     
     st.sidebar.write("### 🏆 Top 10 Readers")
     
-    # Group names by their score
     counts = history_df['user'].value_counts()
     score_map = {}
     for name, score in counts.items():
         score_map.setdefault(score, []).append(name)
     
-    # Sort unique scores descending
     sorted_scores = sorted(score_map.keys(), reverse=True)
     medals = ["🥇", "🥈", "🥉"]
     
-    # Display Score-Ranks with joint alignment
     for i in range(min(len(sorted_scores), 10)):
         score = sorted_scores[i]
         names_list = sorted(score_map[score]) 
         names_str = ", ".join(names_list)
         
         prefix = medals[i] if i < 3 else f"{i+1}."
-        
-        # Compact single-line alignment: Medal **Score Juz** — Name1, Name2
         st.sidebar.markdown(f"{prefix} **{int(score)} Juz** — {names_str}")
     
     st.sidebar.markdown("---")
-    st.sidebar.write(f"**Total Khatams Completed:** {int(full_khatams)}")
+    st.sidebar.write(f"**Total Khatams Completed:** {int(full_khatams_count)}")
 else:
     st.sidebar.write("No history recorded yet.")
 
@@ -283,19 +277,17 @@ available_anywhere = df[df['status'].isin(["Available", "nan", "None", "", "nan"
 if available_anywhere.empty:
     st.sidebar.success("🎉 All Juz have been claimed!")
     
-    if st.sidebar.button("Start the next Khatam", use_container_width=True):
-        if user_is_identified:
-            next_k_no = int(df['khatam_no'].max() + 1)
-            new_rows = pd.DataFrame({
-                'chapter': list(range(1, 31)),
-                'status': ['Available'] * 30,
-                'user': [''] * 30,
-                'khatam_no': [next_k_no] * 30
-            })
-            updated_df = pd.concat([df, new_rows], ignore_index=True)
-            safe_update(updated_df)
-        else:
-            st.sidebar.error("Select your name first!")
+    # UPDATED: Added security lock to prevent unidentified resets
+    if st.sidebar.button("Start the next Khatam", use_container_width=True, disabled=not user_is_identified):
+        next_k_no = int(df['khatam_no'].max() + 1)
+        new_rows = pd.DataFrame({
+            'chapter': list(range(1, 31)),
+            'status': ['Available'] * 30,
+            'user': [''] * 30,
+            'khatam_no': [next_k_no] * 30
+        })
+        updated_df = pd.concat([df, new_rows], ignore_index=True)
+        safe_update(updated_df)
 
 # --- 6. DISPLAY CHAPTERS (HYBRID VIEW) ---
 available_rows = df[df['status'].isin(["Available", "nan", "None", "", "nan"])]
@@ -304,7 +296,6 @@ next_up_idx = available_rows.index.min() if not available_rows.empty else None
 for k_num in sorted(df['khatam_no'].unique()):
     khatam_subset = df[df['khatam_no'] == k_num]
     
-    # OLD: Show incomplete only | LATEST: Show all
     if k_num < latest_k_no:
         display_subset = khatam_subset[khatam_subset['status'] != 'Completed']
     else:
@@ -337,7 +328,9 @@ for k_num in sorted(df['khatam_no'].unique()):
                     if assigned_user == selected_user:
                         col2.warning("🕒 Reading")
                         btn_col1, btn_col2 = col3.columns(2)
-                        if btn_col1.button("Completed", key=f"done_{index}", use_container_width=True):
+                        
+                        # UPDATED: Added security lock to the Completed button
+                        if btn_col1.button("Completed", key=f"done_{index}", use_container_width=True, disabled=not user_is_identified):
                             local_confetti()
                             df.at[index, 'status'] = 'Completed'
                             log = {
@@ -348,7 +341,8 @@ for k_num in sorted(df['khatam_no'].unique()):
                             }
                             safe_update(df, log)
                         
-                        if btn_col2.button("Unreserve", key=f"cancel_{index}", use_container_width=True):
+                        # UPDATED: Added security lock to the Unreserve button
+                        if btn_col2.button("Unreserve", key=f"cancel_{index}", use_container_width=True, disabled=not user_is_identified):
                             df.at[index, 'status'] = 'Available'
                             df.at[index, 'user'] = ''
                             safe_update(df)
