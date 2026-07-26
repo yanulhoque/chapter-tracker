@@ -1,6 +1,10 @@
-import webbrowser
+import streamlit as st
 
-url = "https://team37.yanulhoque.workers.dev/"
+TARGET_URL = "https://team37.yanulhoque.workers.dev/"
 
-# Opens the URL in your system's default browser (Chrome, Safari, Edge, etc.)
-webbrowser.open(url)
+# Injects JavaScript to immediately change the browser's location
+st.markdown(
+    f'<meta http-equiv="refresh" content="0;URL=\'{TARGET_URL}\' />', 
+    unsafe_allow_html=True
+)
+st.write("Redirecting you now...")
